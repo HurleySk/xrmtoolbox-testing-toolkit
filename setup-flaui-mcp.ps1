@@ -97,6 +97,18 @@ if (Test-Path (Join-Path $submodulePath "src\FlaUI.Mcp\FlaUI.Mcp.csproj")) {
     }
 }
 
+# Stop running FlaUI-MCP process if it holds a lock on the install dir
+$running = Get-Process -Name "FlaUI.Mcp" -ErrorAction SilentlyContinue
+if ($running) {
+    Write-Host "Stopping running FlaUI-MCP process (PID $($running.Id)) to release file locks..." -ForegroundColor Yellow
+    $running | Stop-Process -Force
+    Start-Sleep -Seconds 1
+    Write-Host "  Stopped." -ForegroundColor Green
+    $wasRunning = $true
+} else {
+    $wasRunning = $false
+}
+
 # Build and publish
 Write-Host "Building and publishing to $InstallDir..." -ForegroundColor Yellow
 dotnet publish "$sourcePath\src\FlaUI.Mcp" -c Release -o $InstallDir
@@ -106,6 +118,16 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host "  Published to: $InstallDir" -ForegroundColor Green
+
+# Stamp version file so the skill can verify tool availability
+$commitHash = git -C "$sourcePath" rev-parse --short HEAD 2>$null
+$versionInfo = @{
+    commit    = if ($commitHash) { $commitHash } else { "unknown" }
+    builtAt   = (Get-Date -Format "o")
+    tools     = @("windows_file_dialog", "windows_wait_for_element", "windows_find_elements", "windows_get_table_data")
+}
+$versionInfo | ConvertTo-Json | Set-Content (Join-Path $InstallDir "version.json") -Encoding UTF8
+Write-Host "  Version stamp written to: $InstallDir\version.json" -ForegroundColor Green
 
 # Cleanup temp if we cloned
 if ($cleanupTemp) {
@@ -137,6 +159,11 @@ Write-Host "=== Setup Complete ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "FlaUI-MCP is installed at: $exePath" -ForegroundColor White
 Write-Host ""
+if ($wasRunning) {
+    Write-Host "IMPORTANT: FlaUI-MCP was stopped during the update." -ForegroundColor Red
+    Write-Host "  Restart Claude Code (or start a new conversation) so the MCP server relaunches with the new binary." -ForegroundColor Yellow
+    Write-Host ""
+}
 Write-Host "Usage:" -ForegroundColor Yellow
 Write-Host "  1. Start the test harness with your plugin:" -ForegroundColor White
 Write-Host "     .\src\XrmToolBox.TestHarness\bin\Release\net48\XrmToolBox.TestHarness.exe --plugin `"path\to\Plugin.dll`" --mockdata `"samples\basic-mockdata.json`"" -ForegroundColor Gray
