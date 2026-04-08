@@ -372,8 +372,39 @@ foreach ($file in $csFiles) {
 
 $relationships = $relationships | Sort-Object SchemaName -Unique
 
-# Detect intersect entities: relationship schema names often double as intersect entity names
-$intersectEntityNames = @($relationships | ForEach-Object { $_.SchemaName })
+# Resolve entity pairs from relationship schema names by matching against discovered entities.
+# E.g. "accountleads_association" -> entity1=account, entity2=lead, intersect=accountleads
+$resolvedRelationships = @{}
+foreach ($rel in $relationships) {
+    $rn = $rel.SchemaName
+    # Try to find two entity names from the discovered set that both appear in the schema name
+    $matchedEntities = @($allEntities | Where-Object {
+        $escaped = [regex]::Escape($_)
+        $rn -match "(^|_)${escaped}($|_|s_|s$)"
+    } | Sort-Object { $_.Length } -Descending)
+
+    $e1 = $null; $e2 = $null
+    if ($matchedEntities.Count -ge 2) {
+        $e1 = $matchedEntities[0]
+        $e2 = $matchedEntities[1]
+    } elseif ($matchedEntities.Count -eq 1) {
+        $e1 = $matchedEntities[0]
+        $e2 = "TODO_SET_entity2"
+    }
+
+    # Derive intersect entity name: strip common suffixes like _association
+    $intersectName = $rn -replace '_association$', '' -replace '_relationship$', ''
+
+    $resolvedRelationships[$rn] = @{
+        Entity1 = $e1
+        Entity2 = $e2
+        IntersectEntity = $intersectName
+    }
+}
+
+# Intersect entity names include both the derived intersect names and the raw schema names
+$intersectEntityNames = @($resolvedRelationships.Values | ForEach-Object { $_.IntersectEntity }) + @($relationships | ForEach-Object { $_.SchemaName })
+$intersectEntityNames = $intersectEntityNames | Sort-Object -Unique
 
 if ($relationships.Count -gt 0) {
     Write-Host "  Relationships ($($relationships.Count)): $($relationships.SchemaName -join ', ')" -ForegroundColor Green
@@ -439,20 +470,22 @@ foreach ($rt in $requestTypes) {
             $isCustom = $eName -match '_'
             $isIntersect = $eName -in $intersectEntityNames
 
-            # Build manyToManyRelationships from discovered relationships
+            # Build manyToManyRelationships from resolved relationships
             $entityM2M = @()
             foreach ($rel in $relationships) {
                 $rn = $rel.SchemaName
-                # Associate relationship with entity if schema name contains entity name
-                $escapedName = [regex]::Escape($eName)
-                if ($rn -match "(^|_)${escapedName}($|_|s_)") {
+                $resolved = $resolvedRelationships[$rn]
+                # Associate relationship with entity if it's one of the resolved entities
+                if ($resolved -and ($resolved.Entity1 -eq $eName -or $resolved.Entity2 -eq $eName)) {
+                    $e1 = if ($resolved.Entity1) { $resolved.Entity1 } else { $eName }
+                    $e2 = if ($resolved.Entity2) { $resolved.Entity2 } else { "TODO_SET_entity2" }
                     $entityM2M += [ordered]@{
                         schemaName                = $rn
-                        entity1LogicalName        = $eName
-                        entity2LogicalName        = "TODO_entity2"
-                        intersectEntityName       = $rn
-                        entity1IntersectAttribute = "${eName}id"
-                        entity2IntersectAttribute = "TODO_entity2id"
+                        entity1LogicalName        = $e1
+                        entity2LogicalName        = $e2
+                        intersectEntityName       = $resolved.IntersectEntity
+                        entity1IntersectAttribute = "${e1}id"
+                        entity2IntersectAttribute = "${e2}id"
                     }
                 }
             }
@@ -534,7 +567,7 @@ foreach ($ca in $customActions) {
     $null = $responses.Add(@{
         operation   = "Execute"
         description = "Mock custom action: $($ca.ActionName)"
-        match       = @{ requestType = $ca.ActionName }
+        match       = @{ requestName = $ca.ActionName }
         response    = @{
             results = @{ }
         }
@@ -572,42 +605,42 @@ foreach ($entityName in $allEntities) {
 $null = $responses.Add(@{
     operation   = "RetrieveMultiple"
     description = "Catch-all: return empty result set for unmatched queries"
-    match       = @{ "*" = "*" }
+    match       = @{}
     response    = @{ entities = @(); moreRecords = $false; totalRecordCount = -1 }
 })
 
 $null = $responses.Add(@{
     operation   = "Create"
     description = "Catch-all: return a new GUID for any Create"
-    match       = @{ "*" = "*" }
+    match       = @{}
     response    = @{ id = [guid]::NewGuid().ToString() }
 })
 
 $null = $responses.Add(@{
     operation   = "Update"
     description = "Catch-all: no-op for any Update"
-    match       = @{ "*" = "*" }
+    match       = @{}
     response    = @{ }
 })
 
 $null = $responses.Add(@{
     operation   = "Delete"
     description = "Catch-all: no-op for any Delete"
-    match       = @{ "*" = "*" }
+    match       = @{}
     response    = @{ }
 })
 
 $null = $responses.Add(@{
     operation   = "Associate"
     description = "Catch-all: no-op for any Associate"
-    match       = @{ "*" = "*" }
+    match       = @{}
     response    = @{ }
 })
 
 $null = $responses.Add(@{
     operation   = "Disassociate"
     description = "Catch-all: no-op for any Disassociate"
-    match       = @{ "*" = "*" }
+    match       = @{}
     response    = @{ }
 })
 

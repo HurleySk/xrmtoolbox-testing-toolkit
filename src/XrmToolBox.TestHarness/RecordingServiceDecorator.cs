@@ -83,12 +83,18 @@ namespace XrmToolBox.TestHarness
             try
             {
                 var result = _inner.Execute(request);
-                _recorder.Record("Execute", null, request?.GetType().FullName, true, "live");
+                var recordedTypeName = request != null && request.GetType() == typeof(OrganizationRequest) && request.RequestName != null
+                    ? request.RequestName
+                    : request?.GetType().FullName;
+                _recorder.Record("Execute", null, recordedTypeName, true, "live");
                 return result;
             }
             catch (Exception)
             {
-                _recorder.Record("Execute", null, request?.GetType().FullName, false, "live-error");
+                var recordedTypeName = request != null && request.GetType() == typeof(OrganizationRequest) && request.RequestName != null
+                    ? request.RequestName
+                    : request?.GetType().FullName;
+                _recorder.Record("Execute", null, recordedTypeName, false, "live-error");
                 throw;
             }
         }

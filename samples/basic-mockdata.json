@@ -128,7 +128,13 @@
               "name": "Contoso Ltd",
               "accountid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
               "statecode": { "value": 0 },
-              "statuscode": { "value": 1 }
+              "statuscode": { "value": 1 },
+              "primarycontactid_name": {
+                "type": "AliasedValue",
+                "entityLogicalName": "contact",
+                "attributeLogicalName": "fullname",
+                "value": "Jane Doe"
+              }
             }
           }
         ],

@@ -56,6 +56,15 @@ namespace XrmToolBox.TestHarness.MockService.Serialization
 
             if (token is JObject obj)
             {
+                // AliasedValue: { "type": "AliasedValue", "entityLogicalName": "...", "attributeLogicalName": "...", "value": ... }
+                if (obj.Value<string>("type") == "AliasedValue")
+                {
+                    var entityLogicalName = obj.Value<string>("entityLogicalName") ?? "";
+                    var attributeLogicalName = obj.Value<string>("attributeLogicalName") ?? "";
+                    var innerValue = ConvertAttributeValue(obj["value"]);
+                    return new AliasedValue(entityLogicalName, attributeLogicalName, innerValue);
+                }
+
                 // EntityReference: { "logicalName": "...", "id": "..." }
                 if (obj["logicalName"] != null && obj["id"] != null && obj["value"] == null)
                 {

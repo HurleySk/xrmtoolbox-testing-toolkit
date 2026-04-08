@@ -43,8 +43,20 @@ namespace XrmToolBox.TestHarness.MockService
                     return string.Equals(entityName, value, StringComparison.OrdinalIgnoreCase);
 
                 case "requesttype":
+                    if (request == null) return false;
+                    if (request.GetType().FullName.Equals(value, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    // Fallback: custom actions use base OrganizationRequest with a RequestName
+                    if (request.GetType() == typeof(OrganizationRequest) &&
+                        request.RequestName != null &&
+                        request.RequestName.Equals(value, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    return false;
+
+                case "requestname":
                     return request != null &&
-                           request.GetType().FullName.Equals(value, StringComparison.OrdinalIgnoreCase);
+                           request.RequestName != null &&
+                           request.RequestName.Equals(value, StringComparison.OrdinalIgnoreCase);
 
                 case "queryexpressionentity":
                     return query is QueryExpression qe &&

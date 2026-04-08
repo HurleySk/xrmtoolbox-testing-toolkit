@@ -9,10 +9,13 @@ using XrmToolBox.TestHarness.MockService.Models;
 
 namespace XrmToolBox.TestHarness.MockService
 {
-    public class RequestRecorder
+    public class RequestRecorder : IDisposable
     {
         private readonly ConcurrentBag<RecordedCall> _calls = new ConcurrentBag<RecordedCall>();
         private int _sequence;
+        private Timer _autoFlushTimer;
+        private string _autoFlushPath;
+        private bool _disposed;
 
         public IReadOnlyList<RecordedCall> Calls =>
             _calls.OrderBy(c => c.SequenceNumber).ToList();
@@ -32,6 +35,17 @@ namespace XrmToolBox.TestHarness.MockService
             });
         }
 
+        public void StartAutoFlush(string path, int intervalMs = 5000)
+        {
+            _autoFlushPath = path;
+            _autoFlushTimer = new Timer(_ =>
+            {
+                if (_disposed) return;
+                try { SaveToFile(_autoFlushPath); }
+                catch { /* best-effort flush */ }
+            }, null, intervalMs, intervalMs);
+        }
+
         public void SaveToFile(string path)
         {
             var json = JsonConvert.SerializeObject(Calls, Formatting.Indented);
@@ -42,6 +56,13 @@ namespace XrmToolBox.TestHarness.MockService
         {
             while (_calls.TryTake(out _)) { }
             Interlocked.Exchange(ref _sequence, 0);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _autoFlushTimer?.Dispose();
         }
     }
 }

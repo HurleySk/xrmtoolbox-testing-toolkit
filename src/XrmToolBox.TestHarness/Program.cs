@@ -10,6 +10,21 @@ namespace XrmToolBox.TestHarness
 {
     static class Program
     {
+        private static void FlushRecorder(RequestRecorder recorder, string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            try
+            {
+                recorder.SaveToFile(path);
+                Console.WriteLine($"SDK call recording saved: {path}");
+                Console.WriteLine($"Total calls recorded: {recorder.Calls.Count}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error saving recording: {ex.Message}");
+            }
+        }
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -122,23 +137,28 @@ namespace XrmToolBox.TestHarness
 
             form.Text = $"Test Harness - {pluginName}";
 
+            // Start periodic auto-flush of call recordings so data survives crashes
+            if (!string.IsNullOrEmpty(options.RecordingOutputPath))
+                recorder.StartAutoFlush(options.RecordingOutputPath);
+
+            // Catch unhandled exceptions so we can flush the recorder before dying
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (s, e) =>
+            {
+                Console.Error.WriteLine($"Unhandled UI thread exception: {e.Exception}");
+                FlushRecorder(recorder, options.RecordingOutputPath);
+            };
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                Console.Error.WriteLine($"Unhandled exception: {e.ExceptionObject}");
+                FlushRecorder(recorder, options.RecordingOutputPath);
+            };
+
             Application.Run(form);
 
-            // On exit, write recorded calls
-            if (!string.IsNullOrEmpty(options.RecordingOutputPath))
-            {
-                try
-                {
-                    recorder.SaveToFile(options.RecordingOutputPath);
-                    Console.WriteLine($"SDK call recording saved: {options.RecordingOutputPath}");
-                    Console.WriteLine($"Total calls recorded: {recorder.Calls.Count}");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error saving recording: {ex.Message}");
-                }
-            }
-
+            // Final flush on clean exit
+            FlushRecorder(recorder, options.RecordingOutputPath);
+            recorder.Dispose();
             serviceToDispose?.Dispose();
         }
     }

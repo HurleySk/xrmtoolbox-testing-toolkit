@@ -124,7 +124,12 @@ namespace XrmToolBox.TestHarness.MockService
             var entry = _dataStore.FindMatch("Execute", request: request);
             var matched = entry != null;
 
-            _recorder.Record("Execute", null, request.GetType().FullName, matched, entry?.Description);
+            // Record the RequestName for custom actions (base OrganizationRequest),
+            // otherwise record the .NET type name for typed SDK requests.
+            var recordedTypeName = request.GetType() == typeof(OrganizationRequest) && request.RequestName != null
+                ? request.RequestName
+                : request.GetType().FullName;
+            _recorder.Record("Execute", null, recordedTypeName, matched, entry?.Description);
             ApplyDelay(entry);
 
             if (entry?.Fault != null)
