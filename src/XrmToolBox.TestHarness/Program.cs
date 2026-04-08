@@ -30,6 +30,7 @@ namespace XrmToolBox.TestHarness
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
             CommandLineOptions options;
             try
@@ -133,7 +134,9 @@ namespace XrmToolBox.TestHarness
                 connectionDetail,
                 new Size(options.Width, options.Height),
                 options.AutoConnect,
-                options.ScreenshotDir);
+                options.ScreenshotDir,
+                recorder,
+                options.RecordingOutputPath);
 
             form.Text = $"Test Harness - {pluginName}";
 
@@ -141,8 +144,16 @@ namespace XrmToolBox.TestHarness
             if (!string.IsNullOrEmpty(options.RecordingOutputPath))
                 recorder.StartAutoFlush(options.RecordingOutputPath);
 
+            // Auto-dismiss modal dialogs that block FlaUI UIA operations
+            DialogSuppressor dialogSuppressor = null;
+            if (options.SuppressDialogs)
+            {
+                dialogSuppressor = new DialogSuppressor();
+                dialogSuppressor.Start();
+                Console.WriteLine("Dialog suppression enabled: modal dialogs will be auto-dismissed and logged to stderr");
+            }
+
             // Catch unhandled exceptions so we can flush the recorder before dying
-            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (s, e) =>
             {
                 Console.Error.WriteLine($"Unhandled UI thread exception: {e.Exception}");
@@ -153,11 +164,16 @@ namespace XrmToolBox.TestHarness
                 Console.Error.WriteLine($"Unhandled exception: {e.ExceptionObject}");
                 FlushRecorder(recorder, options.RecordingOutputPath);
             };
+            AppDomain.CurrentDomain.ProcessExit += (s, e) =>
+                FlushRecorder(recorder, options.RecordingOutputPath);
+            Console.CancelKeyPress += (s, e) =>
+                FlushRecorder(recorder, options.RecordingOutputPath);
 
             Application.Run(form);
 
             // Final flush on clean exit
             FlushRecorder(recorder, options.RecordingOutputPath);
+            dialogSuppressor?.Dispose();
             recorder.Dispose();
             serviceToDispose?.Dispose();
         }

@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using McTools.Xrm.Connection;
 using Microsoft.Xrm.Sdk;
 using XrmToolBox.Extensibility;
+using XrmToolBox.TestHarness.MockService;
 
 namespace XrmToolBox.TestHarness
 {
@@ -15,17 +16,22 @@ namespace XrmToolBox.TestHarness
         private readonly ConnectionDetail _connectionDetail;
         private readonly bool _autoConnect;
         private readonly string _screenshotDir;
+        private readonly RequestRecorder _recorder;
+        private readonly string _recordingOutputPath;
         private int _screenshotCount;
 
         public HarnessForm(PluginControlBase pluginControl, IOrganizationService service,
             ConnectionDetail connectionDetail, Size windowSize, bool autoConnect,
-            string screenshotDir)
+            string screenshotDir, RequestRecorder recorder = null,
+            string recordingOutputPath = null)
         {
             _pluginControl = pluginControl;
             _service = service;
             _connectionDetail = connectionDetail;
             _autoConnect = autoConnect;
             _screenshotDir = screenshotDir;
+            _recorder = recorder;
+            _recordingOutputPath = recordingOutputPath;
 
             Text = $"Test Harness - {connectionDetail.OrganizationFriendlyName}";
             Size = windowSize;
@@ -44,6 +50,19 @@ namespace XrmToolBox.TestHarness
 
             if (_autoConnect)
                 InjectService();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (_recorder != null && !string.IsNullOrEmpty(_recordingOutputPath))
+            {
+                try { _recorder.SaveToFile(_recordingOutputPath); }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error flushing recording on close: {ex.Message}");
+                }
+            }
+            base.OnFormClosing(e);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)

@@ -12,6 +12,7 @@ namespace XrmToolBox.TestHarness.MockService
     public class RequestRecorder : IDisposable
     {
         private readonly ConcurrentBag<RecordedCall> _calls = new ConcurrentBag<RecordedCall>();
+        private readonly object _flushLock = new object();
         private int _sequence;
         private Timer _autoFlushTimer;
         private string _autoFlushPath;
@@ -35,7 +36,7 @@ namespace XrmToolBox.TestHarness.MockService
             });
         }
 
-        public void StartAutoFlush(string path, int intervalMs = 5000)
+        public void StartAutoFlush(string path, int intervalMs = 2000)
         {
             _autoFlushPath = path;
             _autoFlushTimer = new Timer(_ =>
@@ -48,8 +49,12 @@ namespace XrmToolBox.TestHarness.MockService
 
         public void SaveToFile(string path)
         {
-            var json = JsonConvert.SerializeObject(Calls, Formatting.Indented);
-            File.WriteAllText(path, json);
+            if (_calls.IsEmpty) return;
+            lock (_flushLock)
+            {
+                var json = JsonConvert.SerializeObject(Calls, Formatting.Indented);
+                File.WriteAllText(path, json);
+            }
         }
 
         public void Clear()

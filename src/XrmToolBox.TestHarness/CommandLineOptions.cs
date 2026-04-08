@@ -14,6 +14,7 @@ namespace XrmToolBox.TestHarness
         public string OrgName { get; set; } = "Mock Organization";
         public string RecordingOutputPath { get; set; }
         public string ConnectionString { get; set; }
+        public bool SuppressDialogs { get; set; }
 
         public static CommandLineOptions Parse(string[] args)
         {
@@ -56,6 +57,9 @@ namespace XrmToolBox.TestHarness
                         break;
                     case "--no-autoconnect":
                         options.AutoConnect = false;
+                        break;
+                    case "--suppress-dialogs":
+                        options.SuppressDialogs = true;
                         break;
                     case "--help":
                     case "-h":
@@ -118,6 +122,7 @@ namespace XrmToolBox.TestHarness
             Console.WriteLine("                           Also reads XRMTOOLBOX_CONNECTION_STRING env var");
             Console.WriteLine("  --record, -r <path>      Record SDK calls to JSON file on exit");
             Console.WriteLine("  --no-autoconnect         Don't inject service on load");
+            Console.WriteLine("  --suppress-dialogs       Auto-dismiss modal dialogs (log text to stderr)");
             Console.WriteLine("  --help, -h               Show this help");
         }
     }
