@@ -20,6 +20,52 @@
       }
     },
     {
+      "operation": "Execute",
+      "description": "RetrieveAllEntities - returns entity metadata for common entities",
+      "match": {
+        "requestType": "Microsoft.Xrm.Sdk.Messages.RetrieveAllEntitiesRequest"
+      },
+      "response": {
+        "responseType": "Microsoft.Xrm.Sdk.Messages.RetrieveAllEntitiesResponse",
+        "entityMetadata": [
+          {
+            "logicalName": "account",
+            "schemaName": "Account",
+            "displayName": "Account",
+            "displayCollectionName": "Accounts",
+            "entitySetName": "accounts",
+            "primaryIdAttribute": "accountid",
+            "primaryNameAttribute": "name",
+            "objectTypeCode": 1,
+            "isCustomEntity": false
+          },
+          {
+            "logicalName": "contact",
+            "schemaName": "Contact",
+            "displayName": "Contact",
+            "displayCollectionName": "Contacts",
+            "entitySetName": "contacts",
+            "primaryIdAttribute": "contactid",
+            "primaryNameAttribute": "fullname",
+            "objectTypeCode": 2,
+            "isCustomEntity": false
+          },
+          {
+            "logicalName": "opportunity",
+            "schemaName": "Opportunity",
+            "displayName": "Opportunity",
+            "displayCollectionName": "Opportunities",
+            "entitySetName": "opportunities",
+            "primaryIdAttribute": "opportunityid",
+            "primaryNameAttribute": "name",
+            "objectTypeCode": 3,
+            "isCustomEntity": false
+          }
+        ],
+        "results": {}
+      }
+    },
+    {
       "operation": "RetrieveMultiple",
       "description": "Return sample solutions list",
       "match": {

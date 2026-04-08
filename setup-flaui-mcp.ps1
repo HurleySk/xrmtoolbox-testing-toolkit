@@ -62,28 +62,55 @@ else {
 
 Write-Host ""
 
-# Clone FlaUI-MCP to temp dir
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "flaui-mcp-setup-$([guid]::NewGuid().ToString('N').Substring(0,8))"
-Write-Host "Cloning FlaUI-MCP..." -ForegroundColor Yellow
-git clone --depth 1 https://github.com/shanselman/FlaUI-MCP.git $tempDir
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to clone FlaUI-MCP"
-    exit 1
+# Locate FlaUI-MCP source (submodule or clone)
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $repoRoot) { $repoRoot = $PSScriptRoot }
+$submodulePath = Join-Path $PSScriptRoot "lib\FlaUI-MCP"
+
+if (Test-Path (Join-Path $submodulePath "src\FlaUI.Mcp\FlaUI.Mcp.csproj")) {
+    Write-Host "Using FlaUI-MCP from submodule at lib/FlaUI-MCP..." -ForegroundColor Yellow
+    $sourcePath = $submodulePath
+    $cleanupTemp = $false
+} else {
+    # Submodule not initialized — try to init it
+    Write-Host "Initializing FlaUI-MCP submodule..." -ForegroundColor Yellow
+    Push-Location $PSScriptRoot
+    git submodule update --init lib/FlaUI-MCP 2>$null
+    Pop-Location
+
+    if (Test-Path (Join-Path $submodulePath "src\FlaUI.Mcp\FlaUI.Mcp.csproj")) {
+        Write-Host "  Submodule initialized." -ForegroundColor Green
+        $sourcePath = $submodulePath
+        $cleanupTemp = $false
+    } else {
+        # Fallback: clone to temp dir
+        $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "flaui-mcp-setup-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+        Write-Host "Submodule not available. Cloning FlaUI-MCP from fork..." -ForegroundColor Yellow
+        git clone --depth 1 https://github.com/HurleySk/FlaUI-MCP.git $tempDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to clone FlaUI-MCP"
+            exit 1
+        }
+        Write-Host "  Cloned to: $tempDir" -ForegroundColor Green
+        $sourcePath = $tempDir
+        $cleanupTemp = $true
+    }
 }
-Write-Host "  Cloned to: $tempDir" -ForegroundColor Green
 
 # Build and publish
 Write-Host "Building and publishing to $InstallDir..." -ForegroundColor Yellow
-dotnet publish "$tempDir\src\FlaUI.Mcp" -c Release -o $InstallDir
+dotnet publish "$sourcePath\src\FlaUI.Mcp" -c Release -o $InstallDir
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Build failed"
-    Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+    if ($cleanupTemp) { Remove-Item -Recurse -Force $sourcePath -ErrorAction SilentlyContinue }
     exit 1
 }
 Write-Host "  Published to: $InstallDir" -ForegroundColor Green
 
-# Cleanup temp
-Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+# Cleanup temp if we cloned
+if ($cleanupTemp) {
+    Remove-Item -Recurse -Force $sourcePath -ErrorAction SilentlyContinue
+}
 
 # Verify exe exists
 $exePath = Join-Path $InstallDir "FlaUI.Mcp.exe"

@@ -397,14 +397,61 @@ foreach ($rt in $requestTypes) {
         continue
     }
     if ($rt.ShortName -eq "RetrieveAllEntitiesRequest") {
-        # Return minimal entity metadata for discovered entities
+        # Build entity metadata stubs for all discovered entities
+        $metadataEntries = @()
+        foreach ($eName in $allEntities) {
+            $eDisplayName = (Get-Culture).TextInfo.ToTitleCase(($eName -replace '_', ' '))
+            $metadataEntries += [ordered]@{
+                logicalName          = $eName
+                schemaName           = ($eDisplayName -replace ' ', '')
+                displayName          = $eDisplayName
+                displayCollectionName = "${eDisplayName}s"
+                entitySetName        = "${eName}s"
+                primaryIdAttribute   = "${eName}id"
+                primaryNameAttribute = "name"
+            }
+        }
+        # If no entities were discovered, add a few common defaults
+        if ($metadataEntries.Count -eq 0) {
+            $metadataEntries = @(
+                [ordered]@{ logicalName = "account"; schemaName = "Account"; displayName = "Account"; primaryIdAttribute = "accountid"; primaryNameAttribute = "name" },
+                [ordered]@{ logicalName = "contact"; schemaName = "Contact"; displayName = "Contact"; primaryIdAttribute = "contactid"; primaryNameAttribute = "fullname" }
+            )
+        }
         $null = $responses.Add(@{
             operation   = "Execute"
             description = "Mock $($rt.ShortName) - returns metadata for discovered entities"
             match       = @{ requestType = $rt.FullTypeName }
             response    = @{
-                responseType = $rt.ResponseType
-                results      = @{ }
+                responseType   = $rt.ResponseType
+                entityMetadata = $metadataEntries
+                results        = @{ }
+            }
+        })
+        continue
+    }
+    if ($rt.ShortName -eq "RetrieveEntityRequest") {
+        # Return metadata for a single entity (first discovered, or account as default)
+        $singleEntity = if ($allEntities.Count -gt 0) { $allEntities[0] } else { "account" }
+        $singleDisplayName = (Get-Culture).TextInfo.ToTitleCase(($singleEntity -replace '_', ' '))
+        $null = $responses.Add(@{
+            operation   = "Execute"
+            description = "Mock $($rt.ShortName) - returns metadata for $singleEntity"
+            match       = @{ requestType = $rt.FullTypeName }
+            response    = @{
+                responseType   = $rt.ResponseType
+                entityMetadata = [ordered]@{
+                    logicalName          = $singleEntity
+                    schemaName           = ($singleDisplayName -replace ' ', '')
+                    displayName          = $singleDisplayName
+                    primaryIdAttribute   = "${singleEntity}id"
+                    primaryNameAttribute = "name"
+                    attributes           = @(
+                        [ordered]@{ logicalName = "${singleEntity}id"; displayName = "$singleDisplayName ID"; attributeType = "Uniqueidentifier" },
+                        [ordered]@{ logicalName = "name"; displayName = "Name"; attributeType = "String" }
+                    )
+                }
+                results        = @{ }
             }
         })
         continue

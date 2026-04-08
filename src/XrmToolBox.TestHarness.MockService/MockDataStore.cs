@@ -5,6 +5,7 @@ using Microsoft.Xrm.Sdk.Query;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using XrmToolBox.TestHarness.MockService.Models;
+using Microsoft.Xrm.Sdk.Metadata;
 using XrmToolBox.TestHarness.MockService.Serialization;
 
 namespace XrmToolBox.TestHarness.MockService
@@ -98,6 +99,17 @@ namespace XrmToolBox.TestHarness.MockService
             }
 
             response.ResponseName = request.RequestName;
+
+            // Handle entityMetadata (used by RetrieveAllEntitiesResponse, RetrieveEntityResponse, etc.)
+            var entityMetadataToken = responseJson["entityMetadata"];
+            if (entityMetadataToken is JArray metadataArray)
+            {
+                response.Results["EntityMetadata"] = MetadataJsonConverter.EntityMetadataArrayFromJson(metadataArray);
+            }
+            else if (entityMetadataToken is JObject metadataObj)
+            {
+                response.Results["EntityMetadata"] = MetadataJsonConverter.EntityMetadataFromJson(metadataObj);
+            }
 
             var results = responseJson["results"] as JObject;
             if (results != null)
