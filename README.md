@@ -88,6 +88,58 @@ Responses are matched in order; first match wins.
 - **`delay`** -- simulate network latency (milliseconds)
 - **`fault`** -- throw `FaultException<OrganizationServiceFault>` with custom error code and message
 
+## Plugin Analyzer / Mock Data Generator
+
+The `generate-mockdata.ps1` script analyzes a plugin's source code and generates:
+- **test-mockdata.json** — starter mock data with response stubs for all discovered SDK patterns
+- **test-control-inventory.json** — all UI controls with names, types, and interaction categories
+
+### Usage
+
+```powershell
+.\generate-mockdata.ps1 -PluginSourceDir "C:\path\to\MyPlugin"
+```
+
+### Options
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `-PluginSourceDir` | Path to plugin project root (required) | |
+| `-OutputPath` | Mock data output path | `<PluginSourceDir>/test-mockdata.json` |
+| `-ControlInventoryPath` | Control inventory output path | `<PluginSourceDir>/test-control-inventory.json` |
+
+### What it discovers
+
+- **UI controls** from `*Control.Designer.cs` — buttons, grids, dropdowns, text fields, checkboxes, etc.
+- **SDK request types** — `new WhoAmIRequest`, `new RetrieveAllEntitiesRequest`, custom `OrganizationRequest("ActionName")`
+- **SDK operations** — direct calls to `RetrieveMultiple`, `Create`, `Delete`, etc.
+- **Entity names** — string literals cross-referenced against known Dataverse entities
+- **FetchXML entities** — `<entity name="...">` patterns in embedded FetchXML
+
+### Example output
+
+```
+=== XrmToolBox Plugin Analyzer ===
+Plugin source: C:\repos\speedy-n-to-n-associate-plugin
+
+--- Phase 1: Discovering UI Controls ---
+  Buttons (7):     btnLoadEntities, btnBrowseCsv, btnStart, btnStop, ...
+  Grids (3):       dgvCsvPreview, dgvFetchPreview, dgvSqlPreview
+  Dropdowns (3):   cmbRelationship, cmbEntity2, cmbEntity1
+
+--- Phase 2: Discovering SDK Request Types ---
+  AssociateRequest, ExecuteMultipleRequest, RetrieveAllEntitiesRequest
+  Custom: OrganizationRequest("ExecutePowerBISql")
+
+--- Phase 4: Discovering Entity Names ---
+  Confirmed entities (4): account, contact, opportunity, systemuser
+
+Generated files:
+  Mock data:         test-mockdata.json (17 response entries)
+  Control inventory: test-control-inventory.json
+  Primary action button: btnLoadEntities
+```
+
 ## UI Automation with FlaUI
 
 XrmToolBox plugins use standard WinForms controls with Hungarian naming conventions (`btnLoad`, `dgvAttributes`, `cboSolutions`, `txtFilter`). WinForms automatically exposes the control `Name` as `AutomationId` in Microsoft UI Automation, making plugins immediately automatable with [FlaUI](https://github.com/FlaUI/FlaUI).
