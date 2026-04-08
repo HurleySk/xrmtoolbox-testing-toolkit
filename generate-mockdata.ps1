@@ -399,23 +399,29 @@ foreach ($rt in $requestTypes) {
     if ($rt.ShortName -eq "RetrieveAllEntitiesRequest") {
         # Build entity metadata stubs for all discovered entities
         $metadataEntries = @()
+        $objectTypeCounter = 10000
         foreach ($eName in $allEntities) {
             $eDisplayName = (Get-Culture).TextInfo.ToTitleCase(($eName -replace '_', ' '))
+            $isCustom = $eName -match '_'
             $metadataEntries += [ordered]@{
-                logicalName          = $eName
-                schemaName           = ($eDisplayName -replace ' ', '')
-                displayName          = $eDisplayName
-                displayCollectionName = "${eDisplayName}s"
-                entitySetName        = "${eName}s"
-                primaryIdAttribute   = "${eName}id"
-                primaryNameAttribute = "name"
+                logicalName            = $eName
+                schemaName             = ($eDisplayName -replace ' ', '')
+                displayName            = $eDisplayName
+                displayCollectionName  = "${eDisplayName}s"
+                entitySetName          = "${eName}s"
+                primaryIdAttribute     = "${eName}id"
+                primaryNameAttribute   = "name"
+                objectTypeCode         = $objectTypeCounter++
+                isCustomEntity         = $isCustom
+                isIntersect            = $false
+                manyToManyRelationships = @()
             }
         }
         # If no entities were discovered, add a few common defaults
         if ($metadataEntries.Count -eq 0) {
             $metadataEntries = @(
-                [ordered]@{ logicalName = "account"; schemaName = "Account"; displayName = "Account"; primaryIdAttribute = "accountid"; primaryNameAttribute = "name" },
-                [ordered]@{ logicalName = "contact"; schemaName = "Contact"; displayName = "Contact"; primaryIdAttribute = "contactid"; primaryNameAttribute = "fullname" }
+                [ordered]@{ logicalName = "account"; schemaName = "Account"; displayName = "Account"; primaryIdAttribute = "accountid"; primaryNameAttribute = "name"; objectTypeCode = 1; isCustomEntity = $false; isIntersect = $false; manyToManyRelationships = @() },
+                [ordered]@{ logicalName = "contact"; schemaName = "Contact"; displayName = "Contact"; primaryIdAttribute = "contactid"; primaryNameAttribute = "fullname"; objectTypeCode = 2; isCustomEntity = $false; isIntersect = $false; manyToManyRelationships = @() }
             )
         }
         $null = $responses.Add(@{

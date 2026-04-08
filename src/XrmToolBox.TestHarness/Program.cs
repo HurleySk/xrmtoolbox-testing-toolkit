@@ -2,6 +2,8 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using McTools.Xrm.Connection;
+using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.Xrm.Sdk;
 using XrmToolBox.TestHarness.MockService;
 
 namespace XrmToolBox.TestHarness
@@ -25,29 +27,70 @@ namespace XrmToolBox.TestHarness
                 return;
             }
 
-            // Load mock data
-            MockDataStore dataStore;
-            try
-            {
-                dataStore = new MockDataStore(options.MockDataPath);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading mock data: {ex.Message}");
-                return;
-            }
-
             var recorder = new RequestRecorder();
-            var mockService = new MockOrganizationService(dataStore, recorder);
+            IOrganizationService service;
+            ConnectionDetail connectionDetail;
+            IDisposable serviceToDispose = null;
 
-            // Create stub ConnectionDetail
-            var connectionDetail = new ConnectionDetail
+            if (!string.IsNullOrEmpty(options.ConnectionString))
             {
-                OrganizationFriendlyName = options.OrgName,
-                WebApplicationUrl = "https://mock.crm.dynamics.com",
-                OrganizationVersion = "9.2.0.0",
-                ServerName = "mock.crm.dynamics.com"
-            };
+                // Real Dataverse connection
+                ServiceClient serviceClient;
+                try
+                {
+                    serviceClient = new ServiceClient(options.ConnectionString);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error creating service client: {ex.Message}");
+                    return;
+                }
+
+                if (!serviceClient.IsReady)
+                {
+                    Console.Error.WriteLine($"Failed to connect: {serviceClient.LastError}");
+                    serviceClient.Dispose();
+                    return;
+                }
+
+                Console.WriteLine($"Connected to: {serviceClient.ConnectedOrgFriendlyName}");
+                serviceToDispose = serviceClient;
+
+                service = !string.IsNullOrEmpty(options.RecordingOutputPath)
+                    ? new RecordingServiceDecorator(serviceClient, recorder)
+                    : (IOrganizationService)serviceClient;
+
+                connectionDetail = new ConnectionDetail
+                {
+                    OrganizationFriendlyName = serviceClient.ConnectedOrgFriendlyName,
+                    OrganizationVersion = serviceClient.ConnectedOrgVersion?.ToString() ?? "9.2.0.0",
+                    ServerName = serviceClient.ConnectedOrgUriActual?.Host ?? "unknown"
+                };
+            }
+            else
+            {
+                // Mock service path
+                MockDataStore dataStore;
+                try
+                {
+                    dataStore = new MockDataStore(options.MockDataPath);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error loading mock data: {ex.Message}");
+                    return;
+                }
+
+                service = new MockOrganizationService(dataStore, recorder);
+
+                connectionDetail = new ConnectionDetail
+                {
+                    OrganizationFriendlyName = options.OrgName,
+                    WebApplicationUrl = "https://mock.crm.dynamics.com",
+                    OrganizationVersion = "9.2.0.0",
+                    ServerName = "mock.crm.dynamics.com"
+                };
+            }
 
             // Load plugin
             Console.WriteLine($"Loading plugin from: {options.PluginDllPath}");
@@ -64,15 +107,13 @@ namespace XrmToolBox.TestHarness
                 Console.Error.WriteLine($"Error loading plugin: {ex.Message}");
                 if (ex.InnerException != null)
                     Console.Error.WriteLine($"  Inner: {ex.InnerException.Message}");
+                serviceToDispose?.Dispose();
                 return;
             }
 
-            // Update connection detail with plugin name
-            connectionDetail.OrganizationFriendlyName = options.OrgName;
-
             var form = new HarnessForm(
                 pluginControl,
-                mockService,
+                service,
                 connectionDetail,
                 new Size(options.Width, options.Height),
                 options.AutoConnect,
@@ -96,6 +137,8 @@ namespace XrmToolBox.TestHarness
                     Console.Error.WriteLine($"Error saving recording: {ex.Message}");
                 }
             }
+
+            serviceToDispose?.Dispose();
         }
     }
 }

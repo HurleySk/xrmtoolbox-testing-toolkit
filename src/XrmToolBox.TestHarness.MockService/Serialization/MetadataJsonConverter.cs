@@ -49,6 +49,10 @@ namespace XrmToolBox.TestHarness.MockService.Serialization
             if (isCustomEntity.HasValue)
                 SetPropertyViaReflection(metadata, "IsCustomEntity", isCustomEntity);
 
+            var isIntersect = json.Value<bool?>("isIntersect");
+            if (isIntersect.HasValue)
+                SetPropertyViaReflection(metadata, "IsIntersect", isIntersect);
+
             var attributes = json["attributes"] as JArray;
             if (attributes != null)
             {
@@ -60,6 +64,19 @@ namespace XrmToolBox.TestHarness.MockService.Serialization
                         : new AttributeMetadata();
                 }
                 SetPropertyViaReflection(metadata, "Attributes", attrArray);
+            }
+
+            var m2mRelationships = json["manyToManyRelationships"] as JArray;
+            if (m2mRelationships != null)
+            {
+                var m2mArray = new ManyToManyRelationshipMetadata[m2mRelationships.Count];
+                for (int i = 0; i < m2mRelationships.Count; i++)
+                {
+                    m2mArray[i] = m2mRelationships[i] is JObject relObj
+                        ? ManyToManyRelationshipFromJson(relObj)
+                        : new ManyToManyRelationshipMetadata();
+                }
+                SetPropertyViaReflection(metadata, "ManyToManyRelationships", m2mArray);
             }
 
             return metadata;
@@ -84,6 +101,20 @@ namespace XrmToolBox.TestHarness.MockService.Serialization
             }
 
             return metadata;
+        }
+
+        public static ManyToManyRelationshipMetadata ManyToManyRelationshipFromJson(JObject json)
+        {
+            var rel = new ManyToManyRelationshipMetadata
+            {
+                SchemaName = json.Value<string>("schemaName"),
+                Entity1LogicalName = json.Value<string>("entity1LogicalName"),
+                Entity2LogicalName = json.Value<string>("entity2LogicalName"),
+                IntersectEntityName = json.Value<string>("intersectEntityName"),
+                Entity1IntersectAttribute = json.Value<string>("entity1IntersectAttribute"),
+                Entity2IntersectAttribute = json.Value<string>("entity2IntersectAttribute"),
+            };
+            return rel;
         }
 
         public static Label LabelFromString(string text)

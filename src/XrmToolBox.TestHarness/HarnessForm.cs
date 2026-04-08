@@ -11,18 +11,18 @@ namespace XrmToolBox.TestHarness
     public class HarnessForm : Form
     {
         private readonly PluginControlBase _pluginControl;
-        private readonly IOrganizationService _mockService;
+        private readonly IOrganizationService _service;
         private readonly ConnectionDetail _connectionDetail;
         private readonly bool _autoConnect;
         private readonly string _screenshotDir;
         private int _screenshotCount;
 
-        public HarnessForm(PluginControlBase pluginControl, IOrganizationService mockService,
+        public HarnessForm(PluginControlBase pluginControl, IOrganizationService service,
             ConnectionDetail connectionDetail, Size windowSize, bool autoConnect,
             string screenshotDir)
         {
             _pluginControl = pluginControl;
-            _mockService = mockService;
+            _service = service;
             _connectionDetail = connectionDetail;
             _autoConnect = autoConnect;
             _screenshotDir = screenshotDir;
@@ -87,7 +87,7 @@ namespace XrmToolBox.TestHarness
 
             // Inject mock service via UpdateConnection (same mechanism XrmToolBox uses).
             // Empty actionName avoids triggering deferred method invocation.
-            _pluginControl.UpdateConnection(_mockService, _connectionDetail, string.Empty, null);
+            _pluginControl.UpdateConnection(_service, _connectionDetail, string.Empty, null);
         }
 
         private void OnPluginRequestConnection(object sender, EventArgs e)
@@ -98,7 +98,7 @@ namespace XrmToolBox.TestHarness
             if (e is RequestConnectionEventArgs reqArgs)
             {
                 _pluginControl.UpdateConnection(
-                    _mockService,
+                    _service,
                     _connectionDetail,
                     reqArgs.ActionName,
                     reqArgs.Parameter);
@@ -106,7 +106,7 @@ namespace XrmToolBox.TestHarness
             else
             {
                 _pluginControl.UpdateConnection(
-                    _mockService,
+                    _service,
                     _connectionDetail,
                     string.Empty,
                     null);
