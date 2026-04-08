@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -20,6 +23,7 @@ namespace XrmToolBox.TestHarness
         private readonly int _currentProcessId;
         private readonly Timer _timer;
         private readonly HashSet<IntPtr> _dismissed = new HashSet<IntPtr>();
+        private readonly string _screenshotDir;
         private bool _disposed;
 
         // Child control classes that indicate a common file dialog, not a MessageBox.
@@ -33,9 +37,10 @@ namespace XrmToolBox.TestHarness
             "ShellTabWindowClass" // tabbed shell view
         };
 
-        public DialogSuppressor()
+        public DialogSuppressor(string screenshotDir = null)
         {
             _currentProcessId = Process.GetCurrentProcess().Id;
+            _screenshotDir = screenshotDir;
             _timer = new Timer { Interval = 500 };
             _timer.Tick += OnTick;
         }
@@ -77,9 +82,14 @@ namespace XrmToolBox.TestHarness
             var title = GetWindowTextString(hWnd);
             var body = GetDialogStaticText(hWnd);
 
+            // Capture screenshot BEFORE dismissing so the dialog is visible in the image
+            var screenshotPath = CaptureScreenshot(title);
+
             Console.Error.WriteLine($"[DialogSuppressor] Auto-dismissing modal dialog:");
             Console.Error.WriteLine($"  Title: {title}");
             Console.Error.WriteLine($"  Body: {body}");
+            if (screenshotPath != null)
+                Console.Error.WriteLine($"  Screenshot: {screenshotPath}");
 
             _dismissed.Add(hWnd);
 
@@ -130,6 +140,52 @@ namespace XrmToolBox.TestHarness
                 }
                 return true;
             }, IntPtr.Zero);
+        }
+
+        /// <summary>
+        /// Captures a screenshot of the primary screen (so the dialog + harness are both visible).
+        /// Returns the file path, or null if screenshots are not configured.
+        /// </summary>
+        private string CaptureScreenshot(string dialogTitle)
+        {
+            if (string.IsNullOrEmpty(_screenshotDir)) return null;
+            try
+            {
+                Directory.CreateDirectory(_screenshotDir);
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                var safeTitle = SanitizeFilename(dialogTitle);
+                var filename = $"dialog_{safeTitle}_{timestamp}.png";
+                var path = Path.Combine(_screenshotDir, filename);
+
+                var bounds = Screen.PrimaryScreen.Bounds;
+                using (var bmp = new Bitmap(bounds.Width, bounds.Height))
+                {
+                    using (var g = Graphics.FromImage(bmp))
+                        g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+                    bmp.Save(path, ImageFormat.Png);
+                }
+                return path;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[DialogSuppressor] Screenshot failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string SanitizeFilename(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "untitled";
+            var sb = new StringBuilder(name.Length);
+            foreach (var c in name)
+            {
+                if (char.IsLetterOrDigit(c) || c == '-' || c == '_')
+                    sb.Append(c);
+                else if (c == ' ')
+                    sb.Append('_');
+            }
+            var result = sb.ToString();
+            return result.Length > 40 ? result.Substring(0, 40) : result;
         }
 
         private static string GetWindowTextString(IntPtr hWnd)
