@@ -96,10 +96,24 @@ XrmToolBox plugins use standard WinForms controls with Hungarian naming conventi
 
 [FlaUI-MCP](https://github.com/shanselman/FlaUI-MCP) exposes Windows UI Automation through the Model Context Protocol, letting AI assistants like Claude Code interact with the plugin UI.
 
-1. Install FlaUI-MCP
-2. Start the test harness with your plugin
-3. Connect your AI agent via MCP
-4. The agent can find controls, click buttons, read text, and take screenshots
+**Quick setup** (requires .NET 8+ SDK):
+
+```powershell
+.\setup-flaui-mcp.ps1
+```
+
+This clones FlaUI-MCP, builds it, publishes to `C:\tools\FlaUI-MCP`, and registers it with Claude Code as the `flaui-mcp` MCP server. Options:
+
+```powershell
+.\setup-flaui-mcp.ps1 -InstallDir "D:\my-tools\FlaUI-MCP" -Scope project
+```
+
+**Manual setup:**
+
+1. Clone and build FlaUI-MCP: `git clone https://github.com/shanselman/FlaUI-MCP && dotnet publish src/FlaUI.Mcp -c Release -o C:\tools\FlaUI-MCP`
+2. Register with Claude Code: `claude mcp add flaui-mcp "C:\tools\FlaUI-MCP\FlaUI.Mcp.exe"`
+3. Start the test harness with your plugin
+4. Claude Code can now find controls, click buttons, read text, and take screenshots
 
 ## Architecture
 
