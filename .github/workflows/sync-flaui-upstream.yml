@@ -1,0 +1,94 @@
+name: Sync FlaUI-MCP upstream
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Weekly on Monday at 9am UTC
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote to submodule
+        working-directory: lib/FlaUI-MCP
+        run: |
+          git remote add upstream https://github.com/shanselman/FlaUI-MCP.git 2>/dev/null || true
+          git fetch upstream
+
+      - name: Check for upstream changes
+        id: check
+        working-directory: lib/FlaUI-MCP
+        run: |
+          CURRENT=$(git rev-parse HEAD)
+          UPSTREAM=$(git rev-parse upstream/main)
+          if [ "$CURRENT" = "$UPSTREAM" ]; then
+            echo "up_to_date=true" >> $GITHUB_OUTPUT
+            echo "No upstream changes"
+          else
+            # Check if upstream has commits we don't have
+            NEW_COMMITS=$(git log HEAD..upstream/main --oneline 2>/dev/null | head -20)
+            if [ -z "$NEW_COMMITS" ]; then
+              echo "up_to_date=true" >> $GITHUB_OUTPUT
+              echo "Fork is ahead or diverged, no new upstream commits"
+            else
+              echo "up_to_date=false" >> $GITHUB_OUTPUT
+              echo "New upstream commits:"
+              echo "$NEW_COMMITS"
+              echo "commit_summary<<EOF" >> $GITHUB_OUTPUT
+              echo "$NEW_COMMITS" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Merge upstream and update submodule
+        if: steps.check.outputs.up_to_date == 'false'
+        working-directory: lib/FlaUI-MCP
+        run: |
+          git checkout main
+          git merge upstream/main --no-edit
+          git push origin main
+
+      - name: Update submodule reference
+        if: steps.check.outputs.up_to_date == 'false'
+        run: |
+          BRANCH="chore/sync-flaui-upstream-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git add lib/FlaUI-MCP
+          git commit -m "Update FlaUI-MCP submodule with upstream changes"
+          git push origin "$BRANCH"
+
+      - name: Create pull request
+        if: steps.check.outputs.up_to_date == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --title "Update FlaUI-MCP submodule with upstream changes" \
+            --body "$(cat <<'EOF'
+          ## Summary
+          Automated sync of FlaUI-MCP submodule with upstream (shanselman/FlaUI-MCP).
+
+          ### New upstream commits
+          ${{ steps.check.outputs.commit_summary }}
+
+          ## Test plan
+          - [ ] Build passes (`dotnet build lib/FlaUI-MCP/src/FlaUI.Mcp --configuration Release`)
+          - [ ] Custom tools still present in Program.cs
+          - [ ] No merge conflicts with our custom tools
+          EOF
+          )"
