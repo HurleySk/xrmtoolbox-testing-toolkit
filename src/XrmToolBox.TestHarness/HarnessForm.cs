@@ -85,7 +85,7 @@ namespace XrmToolBox.TestHarness
             // plugin calls ExecuteMethod() and Service is null.
             _pluginControl.OnRequestConnection += OnPluginRequestConnection;
 
-            // Inject mock service via UpdateConnection (same mechanism XrmToolBox uses).
+            // Inject service via UpdateConnection (same mechanism XrmToolBox uses).
             // Empty actionName avoids triggering deferred method invocation.
             _pluginControl.UpdateConnection(_service, _connectionDetail, string.Empty, null);
         }

@@ -63,6 +63,7 @@ namespace XrmToolBox.TestHarness
                 connectionDetail = new ConnectionDetail
                 {
                     OrganizationFriendlyName = serviceClient.ConnectedOrgFriendlyName,
+                    WebApplicationUrl = serviceClient.ConnectedOrgUriActual?.ToString(),
                     OrganizationVersion = serviceClient.ConnectedOrgVersion?.ToString() ?? "9.2.0.0",
                     ServerName = serviceClient.ConnectedOrgUriActual?.Host ?? "unknown"
                 };

@@ -22,53 +22,121 @@ namespace XrmToolBox.TestHarness
 
         public Guid Create(Entity entity)
         {
-            _recorder.Record("Create", entity?.LogicalName, null, true, "live");
-            return _inner.Create(entity);
+            try
+            {
+                var result = _inner.Create(entity);
+                _recorder.Record("Create", entity?.LogicalName, null, true, "live");
+                return result;
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Create", entity?.LogicalName, null, false, "live-error");
+                throw;
+            }
         }
 
         public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet)
         {
-            _recorder.Record("Retrieve", entityName, null, true, "live");
-            return _inner.Retrieve(entityName, id, columnSet);
+            try
+            {
+                var result = _inner.Retrieve(entityName, id, columnSet);
+                _recorder.Record("Retrieve", entityName, null, true, "live");
+                return result;
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Retrieve", entityName, null, false, "live-error");
+                throw;
+            }
         }
 
         public void Update(Entity entity)
         {
-            _recorder.Record("Update", entity?.LogicalName, null, true, "live");
-            _inner.Update(entity);
+            try
+            {
+                _inner.Update(entity);
+                _recorder.Record("Update", entity?.LogicalName, null, true, "live");
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Update", entity?.LogicalName, null, false, "live-error");
+                throw;
+            }
         }
 
         public void Delete(string entityName, Guid id)
         {
-            _recorder.Record("Delete", entityName, null, true, "live");
-            _inner.Delete(entityName, id);
+            try
+            {
+                _inner.Delete(entityName, id);
+                _recorder.Record("Delete", entityName, null, true, "live");
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Delete", entityName, null, false, "live-error");
+                throw;
+            }
         }
 
         public OrganizationResponse Execute(OrganizationRequest request)
         {
-            _recorder.Record("Execute", null, request?.GetType().FullName, true, "live");
-            return _inner.Execute(request);
+            try
+            {
+                var result = _inner.Execute(request);
+                _recorder.Record("Execute", null, request?.GetType().FullName, true, "live");
+                return result;
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Execute", null, request?.GetType().FullName, false, "live-error");
+                throw;
+            }
         }
 
         public EntityCollection RetrieveMultiple(QueryBase query)
         {
             var entityName = (query as QueryExpression)?.EntityName;
-            _recorder.Record("RetrieveMultiple", entityName, null, true, "live");
-            return _inner.RetrieveMultiple(query);
+            try
+            {
+                var result = _inner.RetrieveMultiple(query);
+                _recorder.Record("RetrieveMultiple", entityName, null, true, "live");
+                return result;
+            }
+            catch (Exception)
+            {
+                _recorder.Record("RetrieveMultiple", entityName, null, false, "live-error");
+                throw;
+            }
         }
 
         public void Associate(string entityName, Guid entityId, Relationship relationship,
             EntityReferenceCollection relatedEntities)
         {
-            _recorder.Record("Associate", entityName, null, true, "live");
-            _inner.Associate(entityName, entityId, relationship, relatedEntities);
+            try
+            {
+                _inner.Associate(entityName, entityId, relationship, relatedEntities);
+                _recorder.Record("Associate", entityName, null, true, "live");
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Associate", entityName, null, false, "live-error");
+                throw;
+            }
         }
 
         public void Disassociate(string entityName, Guid entityId, Relationship relationship,
             EntityReferenceCollection relatedEntities)
         {
-            _recorder.Record("Disassociate", entityName, null, true, "live");
-            _inner.Disassociate(entityName, entityId, relationship, relatedEntities);
+            try
+            {
+                _inner.Disassociate(entityName, entityId, relationship, relatedEntities);
+                _recorder.Record("Disassociate", entityName, null, true, "live");
+            }
+            catch (Exception)
+            {
+                _recorder.Record("Disassociate", entityName, null, false, "live-error");
+                throw;
+            }
         }
     }
 }

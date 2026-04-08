@@ -72,7 +72,9 @@
             "primaryIdAttribute": "opportunityid",
             "primaryNameAttribute": "name",
             "objectTypeCode": 3,
-            "isCustomEntity": false
+            "isCustomEntity": false,
+            "isIntersect": false,
+            "manyToManyRelationships": []
           }
         ],
         "results": {}
