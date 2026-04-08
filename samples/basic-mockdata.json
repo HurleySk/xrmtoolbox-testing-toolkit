@@ -37,7 +37,18 @@
             "primaryIdAttribute": "accountid",
             "primaryNameAttribute": "name",
             "objectTypeCode": 1,
-            "isCustomEntity": false
+            "isCustomEntity": false,
+            "isIntersect": false,
+            "manyToManyRelationships": [
+              {
+                "schemaName": "accountleads_association",
+                "entity1LogicalName": "account",
+                "entity2LogicalName": "lead",
+                "intersectEntityName": "accountleads",
+                "entity1IntersectAttribute": "accountid",
+                "entity2IntersectAttribute": "leadid"
+              }
+            ]
           },
           {
             "logicalName": "contact",
@@ -48,7 +59,9 @@
             "primaryIdAttribute": "contactid",
             "primaryNameAttribute": "fullname",
             "objectTypeCode": 2,
-            "isCustomEntity": false
+            "isCustomEntity": false,
+            "isIntersect": false,
+            "manyToManyRelationships": []
           },
           {
             "logicalName": "opportunity",
@@ -59,7 +72,9 @@
             "primaryIdAttribute": "opportunityid",
             "primaryNameAttribute": "name",
             "objectTypeCode": 3,
-            "isCustomEntity": false
+            "isCustomEntity": false,
+            "isIntersect": false,
+            "manyToManyRelationships": []
           }
         ],
         "results": {}

@@ -13,6 +13,7 @@ namespace XrmToolBox.TestHarness
         public bool AutoConnect { get; set; } = true;
         public string OrgName { get; set; } = "Mock Organization";
         public string RecordingOutputPath { get; set; }
+        public string ConnectionString { get; set; }
 
         public static CommandLineOptions Parse(string[] args)
         {
@@ -49,6 +50,10 @@ namespace XrmToolBox.TestHarness
                     case "-r":
                         options.RecordingOutputPath = Dequeue(queue, arg);
                         break;
+                    case "--connection-string":
+                    case "-c":
+                        options.ConnectionString = Dequeue(queue, arg);
+                        break;
                     case "--no-autoconnect":
                         options.AutoConnect = false;
                         break;
@@ -70,6 +75,19 @@ namespace XrmToolBox.TestHarness
                 Console.Error.WriteLine();
                 PrintUsage();
                 Environment.Exit(1);
+            }
+
+            // Fall back to environment variable for connection string (avoids exposing secrets in process listings)
+            if (string.IsNullOrEmpty(options.ConnectionString))
+            {
+                var envConnStr = Environment.GetEnvironmentVariable("XRMTOOLBOX_CONNECTION_STRING");
+                if (!string.IsNullOrEmpty(envConnStr))
+                    options.ConnectionString = envConnStr;
+            }
+
+            if (!string.IsNullOrEmpty(options.ConnectionString) && !string.IsNullOrEmpty(options.MockDataPath))
+            {
+                Console.Error.WriteLine("Warning: --connection-string and --mockdata are both specified. Mock data will be ignored when using a live connection.");
             }
 
             return options;
@@ -95,8 +113,11 @@ namespace XrmToolBox.TestHarness
             Console.WriteLine("  --height <pixels>        Window height (default: 768)");
             Console.WriteLine("  --screenshots, -s <dir>  Directory for screenshot output");
             Console.WriteLine("  --org <name>             Organization display name (default: Mock Organization)");
+            Console.WriteLine("  --connection-string, -c <string>");
+            Console.WriteLine("                           Dataverse connection string (live org)");
+            Console.WriteLine("                           Also reads XRMTOOLBOX_CONNECTION_STRING env var");
             Console.WriteLine("  --record, -r <path>      Record SDK calls to JSON file on exit");
-            Console.WriteLine("  --no-autoconnect         Don't inject mock service on load");
+            Console.WriteLine("  --no-autoconnect         Don't inject service on load");
             Console.WriteLine("  --help, -h               Show this help");
         }
     }
