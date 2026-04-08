@@ -352,6 +352,37 @@ Write-Host ""
 $allEntities = $confirmedEntities + $possibleEntities
 
 # =============================================================================
+# Phase 5b: Discover N:N Relationships
+# =============================================================================
+Write-Host "--- Phase 5b: Discovering N:N Relationships ---" -ForegroundColor Yellow
+
+$relationships = @()
+foreach ($file in $csFiles) {
+    $content = Get-Content $file.FullName -Raw
+
+    # Pattern: new Relationship("schema_name")
+    $relMatches = [regex]::Matches($content, 'new\s+Relationship\(\s*"(\w+)"\s*\)')
+    foreach ($m in $relMatches) {
+        $relationships += [PSCustomObject]@{
+            SchemaName = $m.Groups[1].Value
+            SourceFile = $file.Name
+        }
+    }
+}
+
+$relationships = $relationships | Sort-Object SchemaName -Unique
+
+# Detect intersect entities: relationship schema names often double as intersect entity names
+$intersectEntityNames = @($relationships | ForEach-Object { $_.SchemaName })
+
+if ($relationships.Count -gt 0) {
+    Write-Host "  Relationships ($($relationships.Count)): $($relationships.SchemaName -join ', ')" -ForegroundColor Green
+} else {
+    Write-Host "  No N:N relationships found" -ForegroundColor DarkGray
+}
+Write-Host ""
+
+# =============================================================================
 # Phase 6: Generate mockdata.json
 # =============================================================================
 Write-Host "--- Phase 6: Generating Mock Data ---" -ForegroundColor Yellow
@@ -390,10 +421,13 @@ foreach ($rt in $requestTypes) {
         continue
     }
     if ($rt.ShortName -eq "AssociateRequest") {
-        # AssociateRequest goes through Associate method, not Execute
+        # AssociateRequest: when called via Execute(new AssociateRequest(...)),
+        # the MockOrganizationService auto-routes to the Associate() handler.
+        # The catch-all Associate entry below handles both code paths.
         continue
     }
     if ($rt.ShortName -eq "DisassociateRequest") {
+        # Same auto-routing as AssociateRequest — see Associate handler.
         continue
     }
     if ($rt.ShortName -eq "RetrieveAllEntitiesRequest") {
@@ -403,6 +437,26 @@ foreach ($rt in $requestTypes) {
         foreach ($eName in $allEntities) {
             $eDisplayName = (Get-Culture).TextInfo.ToTitleCase(($eName -replace '_', ' '))
             $isCustom = $eName -match '_'
+            $isIntersect = $eName -in $intersectEntityNames
+
+            # Build manyToManyRelationships from discovered relationships
+            $entityM2M = @()
+            foreach ($rel in $relationships) {
+                $rn = $rel.SchemaName
+                # Associate relationship with entity if schema name contains entity name
+                $escapedName = [regex]::Escape($eName)
+                if ($rn -match "(^|_)${escapedName}($|_|s_)") {
+                    $entityM2M += [ordered]@{
+                        schemaName                = $rn
+                        entity1LogicalName        = $eName
+                        entity2LogicalName        = "TODO_entity2"
+                        intersectEntityName       = $rn
+                        entity1IntersectAttribute = "${eName}id"
+                        entity2IntersectAttribute = "TODO_entity2id"
+                    }
+                }
+            }
+
             $metadataEntries += [ordered]@{
                 logicalName            = $eName
                 schemaName             = ($eDisplayName -replace ' ', '')
@@ -413,8 +467,8 @@ foreach ($rt in $requestTypes) {
                 primaryNameAttribute   = "name"
                 objectTypeCode         = $objectTypeCounter++
                 isCustomEntity         = $isCustom
-                isIntersect            = $false
-                manyToManyRelationships = @()
+                isIntersect            = $isIntersect
+                manyToManyRelationships = $entityM2M
             }
         }
         # If no entities were discovered, add a few common defaults

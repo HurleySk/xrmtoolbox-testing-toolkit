@@ -2,6 +2,7 @@ using System;
 using System.ServiceModel;
 using System.Threading;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 using XrmToolBox.TestHarness.MockService.Models;
 
@@ -97,6 +98,29 @@ namespace XrmToolBox.TestHarness.MockService
 
         public OrganizationResponse Execute(OrganizationRequest request)
         {
+            // Route Execute(AssociateRequest) to the Associate handler so it matches
+            // operation: "Associate" mock entries — plugins may call either service.Associate()
+            // or service.Execute(new AssociateRequest(...)) for the same logical operation.
+            if (request is AssociateRequest assocReq && assocReq.Target != null)
+            {
+                Associate(
+                    assocReq.Target.LogicalName,
+                    assocReq.Target.Id,
+                    assocReq.Relationship,
+                    assocReq.RelatedEntities);
+                return new AssociateResponse();
+            }
+
+            if (request is DisassociateRequest disassocReq && disassocReq.Target != null)
+            {
+                Disassociate(
+                    disassocReq.Target.LogicalName,
+                    disassocReq.Target.Id,
+                    disassocReq.Relationship,
+                    disassocReq.RelatedEntities);
+                return new DisassociateResponse();
+            }
+
             var entry = _dataStore.FindMatch("Execute", request: request);
             var matched = entry != null;
 
