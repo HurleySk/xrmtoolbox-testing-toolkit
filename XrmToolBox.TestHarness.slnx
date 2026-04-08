@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/XrmToolBox.TestHarness.MockService/XrmToolBox.TestHarness.MockService.csproj" />
+    <Project Path="src/XrmToolBox.TestHarness/XrmToolBox.TestHarness.csproj" />
+  </Folder>
+</Solution>
