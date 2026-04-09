@@ -15,6 +15,7 @@ namespace XrmToolBox.TestHarness
         public string RecordingOutputPath { get; set; }
         public string ConnectionString { get; set; }
         public bool SuppressDialogs { get; set; }
+        public string DialogButton { get; set; } = "first";
 
         public static CommandLineOptions Parse(string[] args)
         {
@@ -61,6 +62,9 @@ namespace XrmToolBox.TestHarness
                     case "--suppress-dialogs":
                         options.SuppressDialogs = true;
                         break;
+                    case "--dialog-button":
+                        options.DialogButton = Dequeue(queue, arg);
+                        break;
                     case "--help":
                     case "-h":
                         PrintUsage();
@@ -87,6 +91,11 @@ namespace XrmToolBox.TestHarness
                 var envConnStr = Environment.GetEnvironmentVariable("XRMTOOLBOX_CONNECTION_STRING");
                 if (!string.IsNullOrEmpty(envConnStr))
                     options.ConnectionString = envConnStr;
+            }
+
+            if (options.DialogButton != "first" && !options.SuppressDialogs)
+            {
+                Console.Error.WriteLine("Warning: --dialog-button has no effect without --suppress-dialogs");
             }
 
             if (!string.IsNullOrEmpty(options.ConnectionString) && !string.IsNullOrEmpty(options.MockDataPath))
@@ -123,6 +132,9 @@ namespace XrmToolBox.TestHarness
             Console.WriteLine("  --record, -r <path>      Record SDK calls to JSON file on exit");
             Console.WriteLine("  --no-autoconnect         Don't inject service on load");
             Console.WriteLine("  --suppress-dialogs       Auto-dismiss modal dialogs (log text to stderr)");
+            Console.WriteLine("  --dialog-button <text>   Which button to click in suppressed dialogs");
+            Console.WriteLine("                           Values: first, last, no, cancel, or button text");
+            Console.WriteLine("                           (default: first, only with --suppress-dialogs)");
             Console.WriteLine("  --help, -h               Show this help");
         }
     }

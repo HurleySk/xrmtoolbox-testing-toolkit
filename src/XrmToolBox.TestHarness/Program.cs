@@ -148,9 +148,9 @@ namespace XrmToolBox.TestHarness
             DialogSuppressor dialogSuppressor = null;
             if (options.SuppressDialogs)
             {
-                dialogSuppressor = new DialogSuppressor(options.ScreenshotDir);
+                dialogSuppressor = new DialogSuppressor(options.ScreenshotDir, options.DialogButton);
                 dialogSuppressor.Start();
-                Console.WriteLine("Dialog suppression enabled: modal dialogs will be auto-dismissed and logged to stderr");
+                Console.WriteLine($"Dialog suppression enabled (button: {options.DialogButton}): modal dialogs will be auto-dismissed and logged to stderr");
             }
 
             // Catch unhandled exceptions so we can flush the recorder before dying

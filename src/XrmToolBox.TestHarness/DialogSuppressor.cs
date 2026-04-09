@@ -24,6 +24,7 @@ namespace XrmToolBox.TestHarness
         private readonly Timer _timer;
         private readonly HashSet<IntPtr> _dismissed = new HashSet<IntPtr>();
         private readonly string _screenshotDir;
+        private readonly string _buttonPreference;
         private bool _disposed;
 
         // Child control classes that indicate a common file dialog, not a MessageBox.
@@ -37,10 +38,11 @@ namespace XrmToolBox.TestHarness
             "ShellTabWindowClass" // tabbed shell view
         };
 
-        public DialogSuppressor(string screenshotDir = null)
+        public DialogSuppressor(string screenshotDir = null, string buttonPreference = "first")
         {
             _currentProcessId = Process.GetCurrentProcess().Id;
             _screenshotDir = screenshotDir;
+            _buttonPreference = (buttonPreference ?? "first").ToLowerInvariant();
             _timer = new Timer { Interval = 500 };
             _timer.Tick += OnTick;
         }
@@ -83,9 +85,9 @@ namespace XrmToolBox.TestHarness
             var body = GetDialogStaticText(hWnd);
 
             // Capture screenshot BEFORE dismissing so the dialog is visible in the image
-            var screenshotPath = CaptureScreenshot(title);
+            var screenshotPath = CaptureScreenshot(hWnd, title);
 
-            Console.Error.WriteLine($"[DialogSuppressor] Auto-dismissing modal dialog:");
+            Console.Error.WriteLine($"[DialogSuppressor] Auto-dismissing modal dialog (button preference: {_buttonPreference}):");
             Console.Error.WriteLine($"  Title: {title}");
             Console.Error.WriteLine($"  Body: {body}");
             if (screenshotPath != null)
@@ -93,14 +95,20 @@ namespace XrmToolBox.TestHarness
 
             _dismissed.Add(hWnd);
 
-            // Try WM_CLOSE first (works for OK and OK/Cancel dialogs).
-            // For YesNo/RetryCancel dialogs that lack a close button, fall back
-            // to clicking the first Button child control.
-            PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-
-            // Also click the first button as fallback — handles dialogs where
-            // WM_CLOSE is ignored (YesNo, RetryCancel, AbortRetryIgnore).
-            ClickFirstButton(hWnd);
+            if (_buttonPreference == "first")
+            {
+                // Try WM_CLOSE first (works for OK and OK/Cancel dialogs).
+                // Then click the first button as fallback for YesNo/RetryCancel dialogs
+                // where WM_CLOSE is ignored.
+                PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                ClickButton(hWnd, _buttonPreference);
+            }
+            else
+            {
+                // When a specific button is requested, skip WM_CLOSE to avoid
+                // dismissing via the wrong path before the intended button is clicked.
+                ClickButton(hWnd, _buttonPreference);
+            }
 
             return true;
         }
@@ -126,27 +134,77 @@ namespace XrmToolBox.TestHarness
             return isFileDialog;
         }
 
-        private static void ClickFirstButton(IntPtr hWnd)
+        private static void ClickButton(IntPtr hWnd, string preference)
         {
+            // Collect all Button children with their text
+            var buttons = new List<(IntPtr handle, string text)>();
             EnumChildWindows(hWnd, (child, _) =>
             {
                 var childClass = new StringBuilder(256);
                 GetClassName(child, childClass, childClass.Capacity);
                 if (childClass.ToString() == "Button")
                 {
-                    // BM_CLICK simulates a button press
-                    PostMessage(child, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
-                    return false; // stop after first button
+                    var btnText = GetWindowTextString(child);
+                    buttons.Add((child, btnText));
                 }
                 return true;
             }, IntPtr.Zero);
+
+            if (buttons.Count == 0) return;
+
+            IntPtr target = IntPtr.Zero;
+
+            switch (preference)
+            {
+                case "first":
+                    target = buttons[0].handle;
+                    break;
+                case "last":
+                    target = buttons[buttons.Count - 1].handle;
+                    break;
+                case "no":
+                    target = FindButtonByText(buttons, "&No", "No");
+                    break;
+                case "cancel":
+                    target = FindButtonByText(buttons, "Cancel");
+                    break;
+                default:
+                    // Match by button text (case-insensitive, with/without & accelerator)
+                    target = FindButtonByText(buttons, preference);
+                    break;
+            }
+
+            // Fall back to first button if preferred button not found
+            if (target == IntPtr.Zero)
+            {
+                target = buttons[0].handle;
+                Console.Error.WriteLine($"[DialogSuppressor] Preferred button '{preference}' not found, clicking first button");
+            }
+
+            var clickedText = GetWindowTextString(target);
+            Console.Error.WriteLine($"[DialogSuppressor] Clicking button: {clickedText}");
+            PostMessage(target, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        private static IntPtr FindButtonByText(List<(IntPtr handle, string text)> buttons, params string[] candidates)
+        {
+            foreach (var candidate in candidates)
+            {
+                foreach (var btn in buttons)
+                {
+                    if (string.Equals(btn.text.Replace("&", ""), candidate.Replace("&", ""),
+                        StringComparison.OrdinalIgnoreCase))
+                        return btn.handle;
+                }
+            }
+            return IntPtr.Zero;
         }
 
         /// <summary>
-        /// Captures a screenshot of the primary screen (so the dialog + harness are both visible).
+        /// Captures a screenshot of the dialog window (falls back to full screen if GetWindowRect fails).
         /// Returns the file path, or null if screenshots are not configured.
         /// </summary>
-        private string CaptureScreenshot(string dialogTitle)
+        private string CaptureScreenshot(IntPtr hWnd, string dialogTitle)
         {
             if (string.IsNullOrEmpty(_screenshotDir)) return null;
             try
@@ -157,7 +215,19 @@ namespace XrmToolBox.TestHarness
                 var filename = $"dialog_{safeTitle}_{timestamp}.png";
                 var path = Path.Combine(_screenshotDir, filename);
 
-                var bounds = Screen.PrimaryScreen.Bounds;
+                // Capture just the dialog window; fall back to full screen if GetWindowRect fails
+                Rectangle bounds;
+                if (GetWindowRect(hWnd, out RECT rect)
+                    && rect.Right - rect.Left > 0 && rect.Bottom - rect.Top > 0)
+                {
+                    bounds = new Rectangle(rect.Left, rect.Top,
+                        rect.Right - rect.Left, rect.Bottom - rect.Top);
+                }
+                else
+                {
+                    bounds = Screen.PrimaryScreen.Bounds;
+                }
+
                 using (var bmp = new Bitmap(bounds.Width, bounds.Height))
                 {
                     using (var g = Graphics.FromImage(bmp))
@@ -251,5 +321,14 @@ namespace XrmToolBox.TestHarness
 
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+        }
     }
 }
